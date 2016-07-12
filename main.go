@@ -49,6 +49,7 @@ func main() {
 		for sig := range c {
 			// sig is a ^C, handle it
 			// stop the ticker from ticking
+			fmt.Println("Catching signal", sig)
 			ticker.Stop()
 			done <- struct{}{}
 		}
@@ -97,7 +98,7 @@ func main() {
 			}
 			resp.Body.Close()
 
-			var uint32 color
+			var color uint32
 			if len(sr.Items) > 0 {
 				// if it was passing before, and now we're failing, pulse
 				if !failing {
