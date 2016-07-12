@@ -45,13 +45,15 @@ func main() {
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
-	for sig := range c {
-		fmt.Println("Catching signal", sig)
-		ticker.Stop()
-		done <- struct{}{}
-	}
+	go func() {
+		for sig := range c {
+			fmt.Println("Catching signal", sig)
+			ticker.Stop()
+			done <- struct{}{}
+		}
+	}()
 
-	ws2811.Init(18, *leds, 64)
+	ws2811.Init(18, *leds, 32)
 	defer ws2811.Fini()
 
 	// set all LEDs off initially
@@ -66,7 +68,6 @@ func main() {
 		select {
 		case <-done:
 			fmt.Println("Done")
-			// turn them all off
 			ws2811.Clear()
 			ws2811.Render()
 			ws2811.Wait()
@@ -103,6 +104,7 @@ func main() {
 				// if it was passing before, and now we're failing, pulse
 				if !failing {
 					pulse(*leds)
+					ws2811.SetBrightness(32)
 				}
 				failing = true
 				fmt.Println("Failing...")
