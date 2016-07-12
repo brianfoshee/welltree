@@ -40,7 +40,7 @@ func main() {
 		return
 	}
 
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(10 * time.Second)
 	done := make(chan struct{}, 1)
 
 	c := make(chan os.Signal, 1)
