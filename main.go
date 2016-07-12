@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/jgarff/rpi_ws281x/golang/ws2811"
@@ -38,48 +40,89 @@ func main() {
 		return
 	}
 
-	ws2811.Init(18, *leds, 32)
+	ticker := time.NewTicker(1 * time.Minute)
+	done := make(chan struct{}, 1)
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for sig := range c {
+			// sig is a ^C, handle it
+			// stop the ticker from ticking
+			ticker.Stop()
+			done <- struct{}{}
+		}
+	}()
+
+	ws2811.Init(18, *leds, 64)
 	defer ws2811.Fini()
 
-	// set them all to off first. Weird issue.
+	// set all LEDs off initially
 	ws2811.Clear()
 	ws2811.Render()
 	ws2811.Wait()
 
 	client := &http.Client{}
 
-	qs := "?q=type:pr+repo:nytm/np-well+state:open+status:failure+author:" + *author
-	req, err := http.NewRequest("GET", "https://api.github.com/search/issues"+qs, nil)
-	if err != nil {
-		fmt.Println("error making new request", err)
-		return
-	}
-	req.Header.Add("Authorization", "token "+*token)
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("error doing request", err)
-		return
-	}
+	failing := false
+	for {
+		select {
+		case <-done:
+			fmt.Println("Done")
+			break
+		case <-ticker.C:
+			qs := "?q=type:pr+repo:nytm/np-well+state:open+status:failure+author:" + *author
+			req, err := http.NewRequest("GET", "https://api.github.com/search/issues"+qs, nil)
+			if err != nil {
+				fmt.Println("error making new request", err)
+				return
+			}
+			req.Header.Add("Authorization", "token "+*token)
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("error doing request", err)
+				return
+			}
 
-	if resp.StatusCode != 200 {
-		fmt.Printf("bad response code %d\n", resp.StatusCode)
-		resp.Body.Close()
-		return
-	}
+			if resp.StatusCode != 200 {
+				fmt.Printf("bad response code %d\n", resp.StatusCode)
+				resp.Body.Close()
+				break
+			}
 
-	var sr searchResult
-	if err := json.NewDecoder(resp.Body).Decode(&sr); err != nil {
-		fmt.Println("error decoding body", err)
-		return
-	}
-	resp.Body.Close()
+			var sr searchResult
+			if err := json.NewDecoder(resp.Body).Decode(&sr); err != nil {
+				fmt.Println("error decoding body", err)
+				break
+			}
+			resp.Body.Close()
 
-	if len(sr.Items) > 0 {
-		fmt.Println("Failing...")
-		pulse(*leds)
-	} else {
-		fmt.Println("Passing!")
-		swap(*leds)
+			var uint32 color
+			if len(sr.Items) > 0 {
+				// if it was passing before, and now we're failing, pulse
+				if !failing {
+					pulse(*leds)
+				}
+				failing = true
+				fmt.Println("Failing...")
+				// turn them all steady red
+				color = 0xff0000
+			} else {
+				// if it was failing before, and now we're passing, do another transition
+				if failing {
+					swap(*leds)
+				}
+				failing = false
+				fmt.Println("Passing!")
+				// turn them all steady green
+				color = 0x00ff00
+			}
+			for i := 0; i < *leds; i++ {
+				ws2811.SetLed(i, color)
+			}
+			ws2811.Render()
+			ws2811.Wait()
+		}
 	}
 
 	// turn them all off
