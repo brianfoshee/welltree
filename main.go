@@ -45,15 +45,11 @@ func main() {
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
-	go func() {
-		for sig := range c {
-			// sig is a ^C, handle it
-			// stop the ticker from ticking
-			fmt.Println("Catching signal", sig)
-			ticker.Stop()
-			done <- struct{}{}
-		}
-	}()
+	for sig := range c {
+		fmt.Println("Catching signal", sig)
+		ticker.Stop()
+		done <- struct{}{}
+	}
 
 	ws2811.Init(18, *leds, 64)
 	defer ws2811.Fini()
@@ -70,7 +66,11 @@ func main() {
 		select {
 		case <-done:
 			fmt.Println("Done")
-			break
+			// turn them all off
+			ws2811.Clear()
+			ws2811.Render()
+			ws2811.Wait()
+			return
 		case <-ticker.C:
 			qs := "?q=type:pr+repo:nytm/np-well+state:open+status:failure+author:" + *author
 			req, err := http.NewRequest("GET", "https://api.github.com/search/issues"+qs, nil)
@@ -88,13 +88,13 @@ func main() {
 			if resp.StatusCode != 200 {
 				fmt.Printf("bad response code %d\n", resp.StatusCode)
 				resp.Body.Close()
-				break
+				return
 			}
 
 			var sr searchResult
 			if err := json.NewDecoder(resp.Body).Decode(&sr); err != nil {
 				fmt.Println("error decoding body", err)
-				break
+				return
 			}
 			resp.Body.Close()
 
@@ -125,11 +125,6 @@ func main() {
 			ws2811.Wait()
 		}
 	}
-
-	// turn them all off
-	ws2811.Clear()
-	ws2811.Render()
-	ws2811.Wait()
 }
 
 func swap(leds int) {
