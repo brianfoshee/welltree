@@ -99,6 +99,11 @@ func main() {
 			}
 			resp.Body.Close()
 
+			// TODO add logic to handle the edge case of a PR failing and
+			// showing up under the status:failing criteria, and then a
+			// new commit is pushed up which forces the tests to run again
+			// and sets the status to pending, which makes this check look
+			// like it's passing but really it might not be.
 			var color uint32
 			if len(sr.Items) > 0 {
 				// if it was passing before, and now we're failing, pulse
