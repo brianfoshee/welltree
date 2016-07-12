@@ -73,6 +73,8 @@ func main() {
 			ws2811.Wait()
 			return
 		case <-ticker.C:
+			// TODO pull this GH functionality out into a standalone package
+			// so that I can test it when not on a raspberry pi
 			qs := "?q=type:pr+repo:nytm/np-well+state:open+status:failure+author:" + *author
 			req, err := http.NewRequest("GET", "https://api.github.com/search/issues"+qs, nil)
 			if err != nil {
@@ -106,6 +108,8 @@ func main() {
 			// like it's passing but really it might not be.
 			var color uint32
 			if len(sr.Items) > 0 {
+				// TODO push all items into a slice with PR #
+
 				// if it was passing before, and now we're failing, pulse
 				if !failing {
 					pulse(*leds)
@@ -116,6 +120,11 @@ func main() {
 				// turn them all steady red
 				color = 0xff0000
 			} else {
+				// TODO before marking all as passed, check any PRs in the
+				// stored slice to make sure they're not pending. If they are
+				// pending, don't mark as passed yet. If they're closed, remove
+				// them from the slice.
+
 				// if it was failing before, and now we're passing, do another transition
 				if failing {
 					swap(*leds)
