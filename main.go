@@ -71,7 +71,7 @@ runloop:
 			if err != nil {
 				// Error is always due to a network or request issue
 				fmt.Println(err)
-				// TODO make a network failure light mode
+				rainbow(*leds)
 				break
 			}
 			if f {
@@ -159,5 +159,67 @@ func pulse(leds int) {
 				break // break the for loop for this 'pulse'
 			}
 		}
+	}
+}
+
+// push a color one LED at a time to the top
+func stairClimb(leds int) {
+	off := uint32(0x000000)
+	on := uint32(0xffff00)
+	ws2811.Clear()
+	ws2811.Render()
+	ws2811.Wait()
+
+	for i := 0; i < 5; i++ {
+		for j := 0; j < leds; j++ {
+			// set curr-1 off
+			if j == 0 {
+				ws2811.SetLed(leds-1, off)
+			} else {
+				ws2811.SetLed(j-1, off)
+			}
+
+			// set curr on
+			ws2811.SetLed(j, on)
+
+			ws2811.Render()
+			ws2811.Wait()
+			time.Sleep(120 * time.Millisecond)
+		}
+	}
+
+	for i := 0; i < leds; i++ {
+		ws2811.SetLed(i, on)
+	}
+	ws2811.Render()
+	ws2811.Wait()
+}
+
+var pos = []int{0, 1, 2, 3, 4, 5, 6, 7}
+
+func rainbow(leds int) {
+	colors := []uint32{
+		0x00200000, // red
+		0x00201000, // orange
+		0x00202000, // yellow
+		0x00002000, // green
+		0x00002020, // lightblue
+		0x00000020, // blue
+		0x00100010, // purple
+		0x00200010, // pink
+	}
+	// start pushing colors one at a time into the led strip
+	//offset := 0
+	for k := 0; k < 145; k++ {
+		for i := 0; i < len(pos); i++ {
+			pos[i]++
+			if pos[i] > leds {
+				pos[i] = 0
+			}
+			ws2811.SetLed(pos[i], colors[i])
+		}
+		ws2811.Render()
+		ws2811.Wait()
+		time.Sleep(66 * time.Millisecond)
 	}
 }
