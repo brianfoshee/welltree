@@ -35,7 +35,7 @@ func main() {
 		return
 	}
 
-	s := github.NewSearch(author, token, repo)
+	s := github.NewSearch(*author, *token, *repo)
 
 	ticker := time.NewTicker(10 * time.Second)
 	done := make(chan struct{}, 1)
